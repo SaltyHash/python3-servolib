@@ -715,10 +715,10 @@ def _validate_temp_units(units: str) -> str:
     return units.upper()
 
 
-def control(arm: LewanSoulServoBus):
+def control(servos: LewanSoulServoBus):
     print('Enter commands in the format (ID, angle [deg], time [s]):')
 
-    arm.set_powered(BROADCAST_ID, True)
+    servos.set_powered(BROADCAST_ID, True)
 
     while True:
         try:
@@ -732,10 +732,10 @@ def control(arm: LewanSoulServoBus):
             print('Error:', e)
             continue
 
-        arm.move_time_write(servo_id, angle, time_s)
-        # arm.move_speed_write(servo_id, angle, time_s)
+        servos.move_time_write(servo_id, angle, time_s)
+        # servos.move_speed_write(servo_id, angle, time_s)
 
-    arm.set_powered(BROADCAST_ID, False)
+    servos.set_powered(BROADCAST_ID, False)
 
 
 def _get_servo_ids() -> List[int]:
@@ -744,8 +744,8 @@ def _get_servo_ids() -> List[int]:
     return servo_ids
 
 
-def watch_arm_state(arm: LewanSoulServoBus) -> None:
-    arm.set_powered(BROADCAST_ID, False)
+def watch_servo_state(servos: LewanSoulServoBus) -> None:
+    servos.set_powered(BROADCAST_ID, False)
 
     try:
         # Get the servo IDs the user wants to watch
@@ -755,10 +755,10 @@ def watch_arm_state(arm: LewanSoulServoBus) -> None:
             return
 
         while True:
-            positions = map(arm.pos_read, servo_ids)
+            positions = map(servos.pos_read, servo_ids)
             positions = [int(round(p)) for p in positions]
 
-            vs = arm.velocity_read(*servo_ids)
+            vs = servos.velocity_read(*servo_ids)
             vs = [int(round(v)) for v in vs]
 
             print()
@@ -769,7 +769,7 @@ def watch_arm_state(arm: LewanSoulServoBus) -> None:
         print()
 
 
-def test(arm: LewanSoulServoBus) -> int:
+def test(servos: LewanSoulServoBus) -> int:
     # TODO: This.
 
     # Get the servo IDs the user wants to test
@@ -790,7 +790,7 @@ def test(arm: LewanSoulServoBus) -> int:
 
         print(f'  - pos_read({servo_id}) -> ', end='', flush=True)
         try:
-            degrees = arm.pos_read(servo_id)
+            degrees = servos.pos_read(servo_id)
             print(degrees)
         except Exception as e:
             print(f'Error: {e}')
@@ -803,7 +803,7 @@ def test(arm: LewanSoulServoBus) -> int:
 
         print(f'  - move_time_write({servo_id}, {target}, {move_time}, wait=True) -> ', end='', flush=True)
         try:
-            print(arm.move_time_write(servo_id, target, move_time, wait=True))
+            print(servos.move_time_write(servo_id, target, move_time, wait=True))
         except Exception as e:
             print(f'Error: {e}')
             error = True
@@ -812,7 +812,7 @@ def test(arm: LewanSoulServoBus) -> int:
 
         print(f'  - pos_read({servo_id}) -> ', end='', flush=True)
         try:
-            new_degrees = arm.pos_read(servo_id)
+            new_degrees = servos.pos_read(servo_id)
             print(new_degrees)
         except Exception as e:
             print(f'Error: {e}')
@@ -820,7 +820,7 @@ def test(arm: LewanSoulServoBus) -> int:
             errors += 1
             continue
 
-        # Arm does not appear to have moved?
+        # Servo does not appear to have moved?
         if abs(degrees - new_degrees) < 1:
             print(f'  - Error: Servo does not appear to have moved.')
             error = True
@@ -828,7 +828,7 @@ def test(arm: LewanSoulServoBus) -> int:
 
         print(f'  - move_time_write({servo_id}, {degrees}, {move_time}, wait=True) -> ', end='', flush=True)
         try:
-            print(arm.move_time_write(servo_id, degrees, move_time, wait=True))
+            print(servos.move_time_write(servo_id, degrees, move_time, wait=True))
         except Exception as e:
             print(f'Error: {e}')
             error = True
