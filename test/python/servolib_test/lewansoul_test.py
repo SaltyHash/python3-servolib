@@ -37,11 +37,7 @@ class MockSerial:
 class LewanSoulServoBusTest(unittest.TestCase):
     """
     TODO: Make tests for these methods:
-        - angle_limit_read
-        - angle_offset_read
-        - led_ctrl_read
         - led_error_read
-        - mode_read
         - move_time_read
         - move_time_wait_read
         - temp_max_limit_read
@@ -54,11 +50,21 @@ class LewanSoulServoBusTest(unittest.TestCase):
     def assertWrittenIntsEqual(self, *ints: int):
         self.assertEqual(ints, tuple(self.serial.write_buffer))
 
+    def assertReadBufferIsEmpty(self):
+        self.assertEqual(0, len(self.serial.read_buffer))
+
     def setUp(self) -> None:
         super().setUp()
 
         self.serial = MockSerial()
         self.servos = LewanSoulServoBus(self.serial)
+
+    def test_angle_limit_read(self):
+        self.serial.set_read_buffer(85, 85, 2, 7, 21, 2, 1, 4, 3, 215)
+        limits = self.servos.angle_limit_read(2)
+        self.assertEqual((61.92, 185.28), limits)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(85, 85, 2, 3, 21, 229)
 
     def test_angle_limit_write(self):
         self.servos.angle_limit_write(1, 90, 180)
@@ -67,6 +73,13 @@ class LewanSoulServoBusTest(unittest.TestCase):
     def test_angle_offset_adjust(self):
         self.servos.angle_offset_adjust(1, 10, write=False)
         self.assertWrittenIntsEqual(85, 85, 1, 4, 17, 42, 191)
+
+    def test_angle_offset_read(self):
+        self.serial.set_read_buffer(85, 85, 1, 4, 19, 0x8A, 93)
+        offset = self.servos.angle_offset_read(1)
+        self.assertAlmostEqual(-28.32, offset)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(85, 85, 1, 3, 19, 232)
 
     def test_angle_offset_write(self):
         self.servos.angle_offset_write(1)
@@ -85,13 +98,17 @@ class LewanSoulServoBusTest(unittest.TestCase):
         self.assertWrittenIntsEqual(85, 85, 1, 4, 13, 2, 235)
 
     def test_is_powered(self):
-        servo_id = 2
-        self.serial.set_read_buffer(85, 85, servo_id, 4, 32, 1, 216)
-
-        is_powered = self.servos.is_powered(servo_id)
-
-        self.assertWrittenIntsEqual(85, 85, 2, 3, 32, 218)
+        self.serial.set_read_buffer(85, 85, 2, 4, 32, 1, 216)
+        is_powered = self.servos.is_powered(2)
         self.assertTrue(is_powered)
+        self.assertWrittenIntsEqual(85, 85, 2, 3, 32, 218)
+
+    def test_led_ctrl_read(self):
+        self.serial.set_read_buffer(85, 85, 10, 4, 34, 1, 206)
+        ctrl = self.servos.led_ctrl_read(10)
+        self.assertFalse(ctrl)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(85, 85, 10, 3, 34, 208)
 
     def test_led_ctrl_write__False(self):
         self.servos.led_ctrl_write(2, False)
@@ -105,6 +122,20 @@ class LewanSoulServoBusTest(unittest.TestCase):
         self.servos.led_error_write(2, True, False, True)
         self.assertWrittenIntsEqual(85, 85, 2, 4, 35, 5, 209)
 
+    def test_mode_read__motor(self):
+        self.serial.set_read_buffer(85, 85, 2, 7, 30, 1, 0, 2, 3, 210)
+        mode = self.servos.mode_read(2)
+        self.assertEqual(('motor', 770), mode)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(85, 85, 2, 3, 30, 220)
+
+    def test_mode_read__servo(self):
+        self.serial.set_read_buffer(85, 85, 2, 7, 30, 0, 0, 0, 0, 216)
+        mode = self.servos.mode_read(2)
+        self.assertEqual(('servo', None), mode)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(85, 85, 2, 3, 30, 220)
+
     def test_mode_write__motor(self):
         self.servos.mode_write(BROADCAST_ID, 'motor', 10)
         self.assertWrittenIntsEqual(85, 85, 254, 7, 29, 1, 0, 10, 0, 210)
@@ -114,16 +145,15 @@ class LewanSoulServoBusTest(unittest.TestCase):
         self.assertWrittenIntsEqual(85, 85, 254, 7, 29, 0, 0, 0, 0, 221)
 
     def test_move_speed_write(self):
-        servo_id = 2
+        self.serial.set_read_buffer(85, 85, 2, 5, 28, 10, 0, 210)
 
-        self.serial.set_read_buffer(85, 85, servo_id, 5, 28, 10, 0, 210)
+        self.servos.move_speed_write(2, 12.4, 10)
 
-        self.servos.move_speed_write(servo_id, 12.4, 10)
-
-        self.assertEqual(0, len(self.serial.read_buffer))
+        self.assertReadBufferIsEmpty()
         self.assertWrittenIntsEqual(
-            85, 85, servo_id, 3, 28, 222,
-            85, 85, servo_id, 7, 1, 51, 0, 232, 3, 215)
+            85, 85, 2, 3, 28, 222,
+            85, 85, 2, 7, 1, 51, 0, 232, 3, 215
+        )
 
     def test_move_start(self):
         self.servos.move_start(2)
@@ -142,15 +172,12 @@ class LewanSoulServoBusTest(unittest.TestCase):
         self.assertWrittenIntsEqual(85, 85, 1, 7, 7, 8, 0, 184, 11, 37)
 
     def test_pos_read(self, echo: bool = False):
-        servo_id = 1
-
         self.serial.echo = self.servos.discard_echo = echo
-        self.serial.set_read_buffer(85, 85, servo_id, 5, 28, 10, 0, 211)
-
-        servo_pos = self.servos.pos_read(servo_id)
-
-        self.assertWrittenIntsEqual(85, 85, servo_id, 3, 28, 223)
+        self.serial.set_read_buffer(85, 85, 1, 5, 28, 10, 0, 211)
+        servo_pos = self.servos.pos_read(1)
         self.assertAlmostEqual(2.4, servo_pos)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(85, 85, 1, 3, 28, 223)
 
     def test_pos_read_echo(self):
         self.test_pos_read(echo=True)
