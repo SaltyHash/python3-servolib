@@ -37,11 +37,6 @@ class MockSerial:
 class LewanSoulServoBusTest(unittest.TestCase):
     """
     TODO: Make tests for these methods:
-        - led_error_read
-        - move_time_read
-        - move_time_wait_read
-        - temp_max_limit_read
-        - temp_read
         - velocity_read
         - vin_limit_read
         - vin_read
@@ -118,6 +113,13 @@ class LewanSoulServoBusTest(unittest.TestCase):
         self.servos.led_ctrl_write(2, True)
         self.assertWrittenIntsEqual(85, 85, 2, 4, 33, 0, 216)
 
+    def test_led_error_read(self):
+        self.serial.set_read_buffer(85, 85, 9, 4, 36, 0x02, 204)
+        result = self.servos.led_error_read(9)
+        self.assertEqual((False, True, False), result)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(85, 85, 9, 3, 36, 207)
+
     def test_led_error_write(self):
         self.servos.led_error_write(2, True, False, True)
         self.assertWrittenIntsEqual(85, 85, 2, 4, 35, 5, 209)
@@ -163,9 +165,23 @@ class LewanSoulServoBusTest(unittest.TestCase):
         self.servos.move_stop(2)
         self.assertWrittenIntsEqual(85, 85, 2, 3, 12, 238)
 
+    def test_move_time_read(self):
+        self.serial.set_read_buffer(85, 85, 3, 7, 2, 0, 2, 3, 1, 237)
+        result = self.servos.move_time_read(3)
+        self.assertEqual((122.88, 0.259), result)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(85, 85, 3, 3, 2, 247)
+
     def test_move_time_write(self):
         self.servos.move_time_write(1, 2, 3)
         self.assertWrittenIntsEqual(85, 85, 1, 7, 1, 8, 0, 184, 11, 43)
+
+    def test_move_time_wait_read(self):
+        self.serial.set_read_buffer(85, 85, 3, 7, 8, 0, 2, 3, 1, 231)
+        result = self.servos.move_time_wait_read(3)
+        self.assertEqual((122.88, 0.259), result)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(85, 85, 3, 3, 8, 241)
 
     def test_move_time_wait_write(self):
         self.servos.move_time_wait_write(1, 2, 3)
@@ -189,6 +205,22 @@ class LewanSoulServoBusTest(unittest.TestCase):
     def test_set_powered__True(self):
         self.servos.set_powered(BROADCAST_ID, True)
         self.assertWrittenIntsEqual(85, 85, 254, 4, 31, 1, 221)
+
+    def test_temp_read(self):
+        self.serial.set_read_buffer(85, 85, 3, 4, 26, 80, 142)
+        result = self.servos.temp_read(3, units='C')
+        self.assertAlmostEqual(80.0, result)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(85, 85, 3, 3, 26, 223)
+
+    def test_temp_max_limit_read(self):
+        deg_c = 100
+        deg_f = 212
+        self.serial.set_read_buffer(85, 85, 2, 4, 25, deg_c, 124)
+        result = self.servos.temp_max_limit_read(2)
+        self.assertAlmostEqual(deg_f, result)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(85, 85, 2, 3, 25, 225)
 
     def test_temp_max_limit_write(self):
         self.servos.temp_max_limit_write(1, 75, units='C')
