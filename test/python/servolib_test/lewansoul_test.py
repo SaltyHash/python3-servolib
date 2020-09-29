@@ -35,13 +35,6 @@ class MockSerial:
 
 
 class LewanSoulServoBusTest(unittest.TestCase):
-    """
-    TODO: Make tests for these methods:
-        - velocity_read
-        - vin_limit_read
-        - vin_read
-    """
-
     def assertWrittenIntsEqual(self, *ints: int):
         self.assertEqual(ints, tuple(self.serial.write_buffer))
 
@@ -226,9 +219,38 @@ class LewanSoulServoBusTest(unittest.TestCase):
         self.servos.temp_max_limit_write(1, 75, units='C')
         self.assertWrittenIntsEqual(85, 85, 1, 4, 24, 75, 151)
 
+    def test_velocity_read(self):
+        self.serial.set_read_buffer(
+            85, 85, 1, 5, 28, 10, 0, 211,
+            85, 85, 1, 5, 28, 20, 0, 201
+        )
+        result = self.servos.velocity_read(1)
+        self.assertEqual(1, len(result))
+        # Allow for a fairly large delta; the velocity_read method depends on real-time processing
+        self.assertAlmostEqual(24.0, result[0], delta=0.1)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(
+            85, 85, 1, 3, 28, 223,
+            85, 85, 1, 3, 28, 223
+        )
+
+    def test_vin_limit_read(self):
+        self.serial.set_read_buffer(85, 85, 6, 7, 23, 1, 25, 2, 40, 151)
+        result = self.servos.vin_limit_read(6)
+        self.assertEqual((6.401, 10.242), result)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(85, 85, 6, 3, 23, 223)
+
     def test_vin_limit_write(self):
         self.servos.vin_limit_write(1, 4.5, 12)
         self.assertWrittenIntsEqual(85, 85, 1, 7, 22, 148, 17, 224, 46, 46)
+
+    def test_vin_read(self):
+        self.serial.set_read_buffer(85, 85, 7, 5, 27, 3, 30, 183)
+        result = self.servos.vin_read(7)
+        self.assertAlmostEqual(7.683, result)
+        self.assertReadBufferIsEmpty()
+        self.assertWrittenIntsEqual(85, 85, 7, 3, 27, 218)
 
 
 if __name__ == '__main__':
